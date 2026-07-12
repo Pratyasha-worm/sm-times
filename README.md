@@ -263,9 +263,14 @@ naming every omitted section.
 ## Deploying (Netlify / Vercel, private repo)
 
 This repo is hosted from a **private** GitHub repo and deployed via
-Netlify or Vercel — not GitHub Pages, since Pages would require the
-repo (including `data.js`) to be public. `portfolio.js` is excluded
-from git entirely via `.gitignore` and never leaves your machine.
+Netlify — not GitHub Pages, since Pages would require the repo
+(including `data.js`) to be public. `portfolio.js` is excluded from
+git entirely via `.gitignore` and never leaves your machine.
+
+**Live at: https://sm-times.netlify.app/** — deployed from the
+private repo's `main` branch; Netlify auto-redeploys on every push.
+
+Steps used to get here (for reference / redeploying elsewhere):
 
 1. Create a **private** repo on GitHub (or GitLab/Bitbucket) and push:
    ```bash
@@ -283,9 +288,8 @@ from git entirely via `.gitignore` and never leaves your machine.
 4. Deploy. You'll get a `*.netlify.app` or `*.vercel.app` URL
    immediately; both platforms support adding a custom domain for
    free under "Domain settings."
-5. After you have a real URL, update the placeholder domain in
-   `robots.txt` and `sitemap.xml` (`YOUR-DEPLOYED-DOMAIN`) and push
-   again.
+5. `robots.txt`, `sitemap.xml`, and `index.html`'s `og:url` all
+   already point at the real domain above.
 6. `portfolio.js` won't exist on the deployed site (it's gitignored)
    — the page works fully without it, per the optional-load guard in
    `index.html`. To personalize your own deployed copy, upload

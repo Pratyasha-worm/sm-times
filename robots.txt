@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://YOUR-DEPLOYED-DOMAIN/sitemap.xml
+Sitemap: https://sm-times.netlify.app/sitemap.xml
