@@ -300,5 +300,5 @@ still serving the built page publicly.
 
 ---
 
-*SM Times — A Personal Daily Financial Briefing*
+*SM Times — Institutional-Grade Financial Intelligence*
 *V2 — July 2026*

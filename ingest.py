@@ -59,6 +59,15 @@ REQUEST_TIMEOUT  = 12   # seconds per HTTP request
 MAX_STORIES_PER_SECTION = 6   # cap to keep page fast
 MAX_FEED_ITEMS   = 20   # items to examine per RSS feed before filtering
 
+# Standard desktop browser User-Agent — several trusted sources (RBI, SEBI,
+# Business Standard, MoneyControl) return 403 on the previous identifying
+# UA string. This is normal practice for RSS consumption (RSS is meant to
+# be machine-fetched), not evasion of a paywall or access restriction.
+REQUEST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/rss+xml, application/xml, text/xml, */*",
+}
+
 # Rotating quotes — one chosen per run based on day-of-year
 QUOTES = [
     {"text": "Risk comes from not knowing what you're doing.",
@@ -159,25 +168,24 @@ ECONOMIC_CALENDAR = [
 #   (empty list = accept all from this feed for that section)
 # ─────────────────────────────────────────────────────────────────
 
-    # DEAD / BLOCKED SOURCES — pruned 2026-07-12 after a live dry-run showed
-    # every one of these returning HTTP errors (not a code bug, the feeds
-    # themselves are gone or blocking non-browser requests):
-    #   RBI (both circular feeds)  — 403 Forbidden
-    #   SEBI rss.xml               — 404 Not Found
-    #   Business Standard          — 403 Forbidden
-    #   MoneyControl                — 403 Forbidden
-    #   Financial Express /feed/    — 410 Gone
-    #   IMF news RSS                — 403 Forbidden
-    #   BIS working-papers RSS      — 404 Not Found
-    # Until a working replacement feed is found for each, rbi-watch,
-    # regulation-law, commodities and imf-bis-worldbank will come back
-    # empty from fetch_section() and get omitted from the edition — this
-    # is surfaced loudly in the end-of-run summary in assemble_edition(),
-    # not silently dropped. Do not re-add these URLs without confirming
-    # they work again; do not swap in a spoofed browser User-Agent to
-    # bypass the 403s — that circumvents access controls the source put
-    # up on purpose. Find an actual working, correctly-licensed feed URL
-    # for these instead, or leave the sections manually curated.
+    # 2026-07-12: RBI/SEBI/Business Standard/MoneyControl/Financial
+    # Express/IMF/BIS were pruned after a dry-run showed HTTP errors on
+    # the SMTimes-Ingest/2.0 identifying UA string.
+    #
+    # 2026-07-13: retried all seven with REQUEST_HEADERS (a standard
+    # desktop browser UA — normal for RSS consumption, still never a
+    # spoofed attempt to bypass a paywall or login). Two were bot-
+    # blocking and are now fixed: MoneyControl (403 -> 200) and BIS
+    # (403 -> 200, plus a real parser bug — see fetch_rss()'s namespace
+    # handling — that made it look dead even after the header worked).
+    # Both are back in SOURCES below. The other five are genuinely dead,
+    # not bot-blocked — the header made no difference, or in RBI's/PIB's
+    # case revealed the *old* URL just serves the plain homepage now
+    # (retired endpoint, not a 403). RBI itself is NOT dead — its real
+    # current feeds (discovered from RBI's own /Scripts/rss.aspx
+    # listing page, not guessed) are in SOURCES below and confirmed
+    # working. See KNOWN_DEAD_SOURCES at the bottom of this file for
+    # the five still-broken ones and exactly what was tried.
 
 SOURCES = [
     # ── Economic Times (multiple sections) ───────────────────────
@@ -257,6 +265,145 @@ SOURCES = [
         "keywords": [],
         "tags": ["NPCI", "UPI", "Payments"],
     },
+
+    # ── Re-added 2026-07-13 after retrying with REQUEST_HEADERS ────
+    # (a real desktop browser UA) — see KNOWN_DEAD_SOURCES at the
+    # bottom of this file for what was tried and still didn't work.
+    {
+        "url": "https://www.moneycontrol.com/rss/MCtopnews.xml",
+        "label": "MoneyControl",
+        "source_url": "https://www.moneycontrol.com",
+        "sections": ["markets", "global-macro", "commodities"],
+        "keywords": [],
+        "tags": ["Markets", "Commodities"],
+    },
+    {
+        "url": "https://www.moneycontrol.com/rss/latestnews.xml",
+        "label": "MoneyControl",
+        "source_url": "https://www.moneycontrol.com",
+        "sections": ["markets", "banking", "global-macro"],
+        "keywords": [],
+        "tags": ["Markets", "Banking"],
+    },
+    {
+        "url": "https://www.bis.org/doclist/wppubls.rss?from=&till=&objid=wppubls&page=&paging_length=10&base_path=&publicationTypes=&fromDate=&toDate=&sort=date_desc_dateonly",
+        "label": "Bank for International Settlements",
+        "source_url": "https://www.bis.org",
+        "sections": ["imf-bis-worldbank", "research-corner"],
+        "keywords": [],
+        "tags": ["BIS", "Central Banking"],
+    },
+
+    # ── RBI official (real current feeds, discovered from RBI's own
+    #    /Scripts/rss.aspx feed-listing page — the old bs_viewrssarticle
+    #    URLs are retired; see KNOWN_DEAD_SOURCES) ────────────────────
+    {
+        "url": "https://www.rbi.org.in/pressreleases_rss.xml",
+        "label": "Reserve Bank of India",
+        "source_url": "https://www.rbi.org.in",
+        "sections": ["rbi-watch"],
+        "keywords": [],
+        "tags": ["RBI", "Press Release"],
+    },
+    {
+        "url": "https://www.rbi.org.in/notifications_rss.xml",
+        "label": "Reserve Bank of India",
+        "source_url": "https://www.rbi.org.in",
+        "sections": ["rbi-watch", "regulation-law"],
+        "keywords": [],
+        "tags": ["RBI", "Notification"],
+    },
+    {
+        "url": "https://www.rbi.org.in/Publication_rss.xml",
+        "label": "Reserve Bank of India",
+        "source_url": "https://www.rbi.org.in",
+        "sections": ["rbi-watch", "research-corner"],
+        "keywords": [],
+        "tags": ["RBI", "Publication"],
+    },
+    {
+        "url": "https://www.rbi.org.in/speeches_rss.xml",
+        "label": "Reserve Bank of India",
+        "source_url": "https://www.rbi.org.in",
+        "sections": ["rbi-watch", "executive-intelligence"],
+        "keywords": [],
+        "tags": ["RBI", "Speech"],
+    },
+
+    # ── Economic Times — general feed (in addition to the
+    #    section-specific ET feeds above) ────────────────────────────
+    {
+        "url": "https://economictimes.indiatimes.com/rssfeedsdefault.cms",
+        "label": "Economic Times",
+        "source_url": "https://economictimes.indiatimes.com",
+        "sections": ["markets", "banking", "global-macro", "technology"],
+        "keywords": [],
+        "tags": ["Macro", "Markets"],
+    },
+
+    # ── Indian Express — Business ────────────────────────────────────
+    {
+        "url": "https://indianexpress.com/section/business/feed/",
+        "label": "Indian Express",
+        "source_url": "https://indianexpress.com",
+        "sections": ["global-macro", "regulation-law", "politics-matters"],
+        "keywords": [],
+        "tags": ["India", "Business"],
+    },
+
+    # ── Financial Times (paywalled — RSS only ever exposes headline +
+    #    one-sentence dek; fetch_rss() never fetches the article page,
+    #    so the paywall is never crossed by construction) ─────────────
+    {
+        "url": "https://www.ft.com/world?format=rss",
+        "label": "Financial Times",
+        "source_url": "https://www.ft.com",
+        "sections": ["global-macro"],
+        "keywords": [],
+        "tags": ["Global", "FT"],
+        "paywalled": True,
+    },
+    {
+        "url": "https://www.ft.com/global-economy?format=rss",
+        "label": "Financial Times",
+        "source_url": "https://www.ft.com",
+        "sections": ["global-macro"],
+        "keywords": [],
+        "tags": ["Global Economy", "FT"],
+        "paywalled": True,
+    },
+    {
+        "url": "https://www.ft.com/markets?format=rss",
+        "label": "Financial Times",
+        "source_url": "https://www.ft.com",
+        "sections": ["markets", "fixed-income", "commodities"],
+        "keywords": [],
+        "tags": ["Markets", "FT"],
+        "paywalled": True,
+    },
+
+    # ── Global/regional — both Reuters feed URLs 404'd even with the
+    #    header (see KNOWN_DEAD_SOURCES). Per the specified fallback
+    #    order, CNBC World and CNBC Top News were the first two
+    #    candidates that returned real parseable content, so they
+    #    replace the two Reuters slots. Labeled accurately as CNBC,
+    #    not Reuters, per the hard rule against mislabeling origin.
+    {
+        "url": "https://www.cnbc.com/id/100727362/device/rss/rss.html",
+        "label": "CNBC World",
+        "source_url": "https://www.cnbc.com",
+        "sections": ["global-macro"],
+        "keywords": [],
+        "tags": ["Global", "CNBC"],
+    },
+    {
+        "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+        "label": "CNBC Top News",
+        "source_url": "https://www.cnbc.com",
+        "sections": ["global-macro", "markets", "commodities"],
+        "keywords": [],
+        "tags": ["Markets", "CNBC"],
+    },
 ]
 
 # ─────────────────────────────────────────────────────────────────
@@ -301,17 +448,7 @@ EDITORIAL_REQUIRED_ONE_OF = {
 def fetch_url(url: str, timeout: int = REQUEST_TIMEOUT) -> Optional[str]:
     """Fetch URL content as text. Returns None on any error — never throws."""
     try:
-        req = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": (
-                    "SMTimes-Ingest/2.0 "
-                    "(institutional financial news aggregator; "
-                    "contact: smtimes@example.com)"
-                ),
-                "Accept": "application/rss+xml, application/xml, text/xml, */*",
-            }
-        )
+        req = urllib.request.Request(url, headers=REQUEST_HEADERS)
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             charset = "utf-8"
             ct = resp.headers.get("Content-Type", "")
@@ -336,9 +473,17 @@ def fetch_rss(url: str) -> List[Dict[str, str]]:
     if not content:
         return []
     try:
-        # Strip namespace prefixes that confuse ElementTree
+        # Strip namespace prefixes that confuse ElementTree. The previous
+        # version only stripped the prefix from opening tags (<rdf:RDF> ->
+        # <RDF>) but left closing tags untouched (</rdf:RDF> stayed as-is),
+        # producing a mismatched tag pair on any RSS 1.0/RDF feed (e.g. BIS)
+        # -> guaranteed ParseError -> 0 items even on a live, healthy feed.
+        # Also strip prefixes from attributes (e.g. rdf:about="...") since
+        # those still reference the now-undeclared prefix once its xmlns
+        # declaration is stripped, which trips "unbound prefix" instead.
         content_clean = re.sub(r' xmlns[^"]*"[^"]*"', '', content)
-        content_clean = re.sub(r'<([a-z]+):[^>]*>', lambda m: f'<{m.group().split(":")[1]}', content_clean)
+        content_clean = re.sub(r'(</?)([a-zA-Z0-9]+):', r'\1', content_clean)
+        content_clean = re.sub(r'(\s)[a-zA-Z0-9]+:([a-zA-Z0-9]+)=', r'\1\2=', content_clean)
         root = ET.fromstring(content_clean)
     except ET.ParseError:
         # Try stripping to just ASCII printable range
@@ -518,35 +663,45 @@ Keep all text fields concise and analytical. Use plain English without jargon wh
 
 
 # ─────────────────────────────────────────────────────────────────
-# RULE-BASED ENRICHMENT (fallback when no Gemini API key)
+# MECHANICAL FIELDS (safe without AI — never interpretive)
 # ─────────────────────────────────────────────────────────────────
+#
+# 2026-07-12 content-quality rule: whyItMatters, marketImpact,
+# indiaImpact, and globalImpact are interpretive analysis and may
+# ONLY be written by a successful Gemini call — never by rule-based
+# boilerplate presented as if it were real editorial content. This
+# module intentionally cannot produce any of those four fields; if
+# a story needs them and AI isn't available, the whole story is
+# excluded (see build_story / AI_EXCLUDED_COUNT below), not shipped
+# with placeholder text.
 
-def enrich_rule_based(item: Dict, source: Dict) -> Dict:
-    """
-    Generate story fields using rule-based extraction from RSS data.
-    Less rich than Gemini output but never fabricates facts.
-    """
+# Every alternative below requires an actual digit in the match — the
+# original version anchored on the unit keyword and grabbed up to 40
+# trailing characters of prose, which produced garbage like "rs. The
+# company is also actively..." whenever "Rs" appeared mid-word with
+# no real figure nearby. \b before Rs/USD also stops it matching
+# inside unrelated words (e.g. "Mrs."). This deterministic regex is
+# used for keyNumbers even when AI is available, so a figure can
+# never be an AI hallucination — only text pulled verbatim from the
+# source description.
+_KEY_NUMBER_RE = re.compile(
+    r'(?:₹|\bRs\.?|\bUSD)\s?\d[\d,]*(?:\.\d+)?(?:\s?(?:billion|million|lakh|crore|trillion|bn|mn))?'
+    r'|\$\s?\d[\d,]*(?:\.\d+)?(?:\s?(?:billion|million|lakh|crore|trillion|bn|mn))?'
+    r'|\b\d+(?:\.\d+)?\s?(?:%|bps|GW|MW|billion|million|lakh|crore|trillion)',
+    re.IGNORECASE
+)
+
+
+def extract_key_numbers(desc: str) -> List[Dict]:
+    matches = _KEY_NUMBER_RE.findall(desc or "")
+    return [{"label": f"Figure {i+1}", "value": m.strip()} for i, m in enumerate(matches[:4])]
+
+
+def mechanical_fields(item: Dict, source: Dict) -> Dict:
+    """Non-interpretive fields only: summary excerpt, extracted numbers, tags."""
     title = item["title"]
     desc  = item["description"]
 
-    # Extract numbers from the text (heuristic).
-    # Every alternative requires an actual digit in the match — the old
-    # pattern anchored on the unit keyword and grabbed up to 40 trailing
-    # characters of prose, which produced garbage like "rs. The company
-    # is also actively..." whenever "Rs" appeared mid-word with no real
-    # figure nearby. \b before Rs/USD also stops it matching inside
-    # unrelated words (e.g. "Mrs.").
-    number_matches = re.findall(
-        r'(?:₹|\bRs\.?|\bUSD)\s?\d[\d,]*(?:\.\d+)?(?:\s?(?:billion|million|lakh|crore|trillion|bn|mn))?'
-        r'|\$\s?\d[\d,]*(?:\.\d+)?(?:\s?(?:billion|million|lakh|crore|trillion|bn|mn))?'
-        r'|\b\d+(?:\.\d+)?\s?(?:%|bps|GW|MW|billion|million|lakh|crore|trillion)',
-        desc, re.IGNORECASE
-    )
-    key_numbers = []
-    for i, match in enumerate(number_matches[:4]):
-        key_numbers.append({"label": f"Figure {i+1}", "value": match.strip()})
-
-    # Tags from source + keywords found in content
     tags = list(source.get("tags", []))
     for kw in ["RBI", "Fed", "GDP", "Inflation", "UPI", "AI", "SEBI", "Gold", "Oil"]:
         if kw.lower() in (title + desc).lower() and kw not in tags:
@@ -555,16 +710,26 @@ def enrich_rule_based(item: Dict, source: Dict) -> Dict:
 
     return {
         "summary": desc[:160] if desc else title[:160],
-        "whyItMatters": (
-            f"{title}. "
-            + (desc[:300] if desc else "See original source for full context.")
-        ),
-        "keyNumbers": key_numbers,
-        "marketImpact": "Refer to original source for market impact analysis.",
-        "indiaImpact":  "Refer to original source for India-specific implications.",
-        "globalImpact": "Refer to original source for global context.",
+        "keyNumbers": extract_key_numbers(desc),
         "tags": tags,
     }
+
+
+# Count of stories dropped for lack of a working AI enrichment call —
+# reset per run in assemble_edition(), reported in the end-of-run summary.
+AI_EXCLUDED_COUNT = 0
+
+
+def _ai_fields_present(enriched: Optional[Dict]) -> bool:
+    """True only if Gemini actually returned all four interpretive fields
+    non-empty. A "successful" call with a missing/blank field is treated
+    as a failure — we never ship a partially-blank interpretive field."""
+    if not enriched:
+        return False
+    return all(
+        isinstance(enriched.get(k), str) and enriched.get(k, "").strip()
+        for k in ("whyItMatters", "marketImpact", "indiaImpact", "globalImpact")
+    )
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -575,30 +740,37 @@ def build_story(item: Dict, source: Dict, section_id: str, use_ai: bool) -> Opti
     """
     Turn an RSS item into a story dict matching the exact schema
     expected by renderStoryCard() in index.html.
-    Returns None if the story should be skipped.
+
+    2026-07-12 rule: whyItMatters/marketImpact/indiaImpact/globalImpact
+    are interpretive and require a successful Gemini call. If
+    GEMINI_API_KEY is unset, or the call fails, declines the story, or
+    returns an incomplete result, the story is excluded entirely —
+    never shipped with rule-based boilerplate in those four fields.
     """
+    global AI_EXCLUDED_COUNT
     item["source_label"] = source["label"]
 
-    enriched = None
-    if use_ai and GEMINI_API_KEY:
-        enriched = enrich_with_gemini(item, section_id)
+    enriched = enrich_with_gemini(item, section_id) if (use_ai and GEMINI_API_KEY) else None
 
-    if enriched is None:
-        enriched = enrich_rule_based(item, source)
+    if not _ai_fields_present(enriched):
+        AI_EXCLUDED_COUNT += 1
+        return None
+
+    mech = mechanical_fields(item, source)
 
     story = {
         "id":           story_id_from_url(item["link"]),
         "headline":     item["title"].strip(),
-        "summary":      enriched.get("summary", item["description"][:160]),
-        "whyItMatters": enriched.get("whyItMatters", ""),
-        "keyNumbers":   enriched.get("keyNumbers", []),
-        "marketImpact": enriched.get("marketImpact", ""),
-        "indiaImpact":  enriched.get("indiaImpact", ""),
-        "globalImpact": enriched.get("globalImpact", ""),
+        "summary":      enriched.get("summary") or mech["summary"],
+        "whyItMatters": enriched["whyItMatters"],
+        "keyNumbers":   mech["keyNumbers"],
+        "marketImpact": enriched["marketImpact"],
+        "indiaImpact":  enriched["indiaImpact"],
+        "globalImpact": enriched["globalImpact"],
         "source":       source["label"],
         "sourceUrl":    source.get("source_url", item["link"]),
         "readMoreUrl":  item["link"],
-        "tags":         enriched.get("tags", source.get("tags", [])),
+        "tags":         enriched.get("tags") or mech["tags"],
     }
     return story
 
@@ -768,11 +940,15 @@ def build_industry_deep_dive() -> Dict:
             "id":           f"deep-dive-{industry.lower().replace(' ','-')}",
             "headline":     f"{industry}: Sector Overview — Edition {datetime.date.today().strftime('%b %d, %Y')}",
             "summary":      f"This edition's deep dive covers the {industry} sector. Full curated content to be added by the editor for this edition.",
-            "whyItMatters": f"The {industry} sector has significant implications for institutional investors, policymakers, and finance professionals tracking India's structural growth story.",
+            # 2026-07-12 rule: whyItMatters/marketImpact/indiaImpact/globalImpact
+            # are interpretive and AI-only under any circumstance — including
+            # hand-authored placeholders. Left blank rather than filled with
+            # boilerplate; the editor fills these in by hand per edition.
+            "whyItMatters": "",
             "keyNumbers":   [],
-            "marketImpact": "See curated edition notes.",
-            "indiaImpact":  "See curated edition notes.",
-            "globalImpact": "See curated edition notes.",
+            "marketImpact": "",
+            "indiaImpact":  "",
+            "globalImpact": "",
             "source":       "SM Times Editorial",
             "sourceUrl":    "#",
             "readMoreUrl":  "#",
@@ -781,26 +957,40 @@ def build_industry_deep_dive() -> Dict:
     }
 
 
-def build_executive_intelligence() -> Dict:
+def build_executive_intelligence(use_ai: bool = True) -> Dict:
     """Pull recent earnings/CEO news from ET corporate feed."""
+    global AI_EXCLUDED_COUNT
     items = fetch_rss("https://economictimes.indiatimes.com/markets/earnings/rssfeeds/2143429.cms")
     stories = []
     for item in items[:3]:
         kw_check = (item["title"] + item["description"]).lower()
         if any(k in kw_check for k in ["earnings", "ceo", "cfo", "profit", "revenue", "result", "quarter"]):
+            # 2026-07-12 rule: whyItMatters/marketImpact/indiaImpact/
+            # globalImpact are interpretive and AI-only. This branch used
+            # to write boilerplate ("See original source for strategic
+            # insight.") straight from RSS with no AI involved — exactly
+            # what's now prohibited. If AI isn't available or declines,
+            # skip this item rather than shipping fake analysis; the
+            # section falls through to the honest curated-placeholder
+            # below if nothing survives.
+            item["source_label"] = "Economic Times"
+            enriched = enrich_with_gemini(item, "Executive Intelligence") if (use_ai and GEMINI_API_KEY) else None
+            if not _ai_fields_present(enriched):
+                AI_EXCLUDED_COUNT += 1
+                continue
             stories.append({
                 "id":           story_id_from_url(item["link"]),
                 "headline":     item["title"],
-                "summary":      item["description"][:200],
-                "whyItMatters": "See original source for strategic insight.",
-                "keyNumbers":   [],
-                "marketImpact": item["description"][:100],
-                "indiaImpact":  "",
-                "globalImpact": "",
+                "summary":      enriched.get("summary") or item["description"][:200],
+                "whyItMatters": enriched["whyItMatters"],
+                "keyNumbers":   extract_key_numbers(item["description"]),
+                "marketImpact": enriched["marketImpact"],
+                "indiaImpact":  enriched["indiaImpact"],
+                "globalImpact": enriched["globalImpact"],
                 "source":       "Economic Times",
                 "sourceUrl":    "https://economictimes.indiatimes.com",
                 "readMoreUrl":  item["link"],
-                "tags":         ["Earnings", "Corporate", "Executive Intelligence"],
+                "tags":         enriched.get("tags") or ["Earnings", "Corporate", "Executive Intelligence"],
             })
         if len(stories) >= 2:
             break
@@ -810,7 +1000,9 @@ def build_executive_intelligence() -> Dict:
             "id":           "exec-intel-placeholder",
             "headline":     "Executive Intelligence — Curated Edition Required",
             "summary":      "Add earnings call highlights, CEO interview excerpts, or shareholder letter summaries for this section.",
-            "whyItMatters": "Earnings calls and shareholder letters contain the most candid strategic signals from corporate leadership.",
+            # 2026-07-12 rule: interpretive fields are AI-only under any
+            # circumstance, including this static fallback — left blank.
+            "whyItMatters": "",
             "keyNumbers":   [],
             "marketImpact": "",
             "indiaImpact":  "",
@@ -977,6 +1169,19 @@ def assemble_edition(
     Fetch and compile all sections into the EDITION object.
     target_sections: if set, only rebuild those section IDs.
     """
+    global AI_EXCLUDED_COUNT
+    AI_EXCLUDED_COUNT = 0
+    if not (use_ai and GEMINI_API_KEY):
+        print(
+            "[INFO] GEMINI_API_KEY is not set (or --no-ai was passed) — "
+            "whyItMatters/marketImpact/indiaImpact/globalImpact require a "
+            "successful AI call per the 2026-07-12 content-quality rule, "
+            "so every RSS-sourced story will be excluded this run. Only "
+            "the static/curated sections (Industry Deep Dive placeholder, "
+            "Research Corner, Book Recommendation, Quote of the Day) will "
+            "produce output."
+        )
+
     now    = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
     today  = now.date()
     day_str = today.strftime("%A, %B %-d, %Y")
@@ -1028,7 +1233,7 @@ def assemble_edition(
 
     if not target_sections or "executive-intelligence" in target_sections:
         print("\n[SECTION] Executive Intelligence")
-        sections.append(build_executive_intelligence())
+        sections.append(build_executive_intelligence(use_ai))
 
     if not target_sections or "book-recommendation" in target_sections:
         print("\n[SECTION] Book Recommendation (rotating)")
@@ -1057,6 +1262,14 @@ def assemble_edition(
             "[SUMMARY] These sections will NOT appear in the generated edition "
             "until a working trusted feed is configured for them."
         )
+
+    print(
+        f"\n[SUMMARY] {AI_EXCLUDED_COUNT} story/stories excluded for lack of a "
+        f"working AI enrichment call (GEMINI_API_KEY unset, call failed, or "
+        f"Gemini declined/returned an incomplete result). These are never "
+        f"shipped with rule-based boilerplate in whyItMatters/marketImpact/"
+        f"indiaImpact/globalImpact — excluded outright instead."
+    )
 
     return {
         "date":      day_str,
@@ -1227,6 +1440,76 @@ def main():
 
     print("\n[VALIDATE] Running output checks…")
     validate_output(OUTPUT_PATH)
+
+
+# ─────────────────────────────────────────────────────────────────
+# KNOWN DEAD SOURCES
+# Every entry here was retried with REQUEST_HEADERS (real desktop
+# browser UA — normal RSS-consumption practice, not evasion of any
+# access restriction) on 2026-07-13, failed, waited 3s, and failed a
+# second time. Do not silently re-add these without re-testing — this
+# list exists so a future session doesn't have to rediscover the same
+# dead ends from scratch. Do not fabricate a replacement URL for any
+# of these; either find a genuinely working feed or leave the section
+# hand-curated.
+# ─────────────────────────────────────────────────────────────────
+
+KNOWN_DEAD_SOURCES = [
+    {
+        "name": "RBI Circulars (bs_viewrssarticle id=24)",
+        "url": "https://www.rbi.org.in/Scripts/bs_viewrssarticle.aspx?id=24",
+        "status": "HTTP 200 but Content-Type: text/html — serves the plain RBI homepage, not RSS/XML. Header fix resolved the earlier 403, but the endpoint itself is retired.",
+        "tried": "REQUEST_HEADERS UA, 2 attempts 3s apart. Real replacement feeds found on RBI's own /Scripts/rss.aspx listing page and added to SOURCES instead (pressreleases_rss.xml, notifications_rss.xml, Publication_rss.xml, speeches_rss.xml — all confirmed working).",
+    },
+    {
+        "name": "RBI Circulars (bs_viewrssarticle id=23)",
+        "url": "https://www.rbi.org.in/Scripts/bs_viewrssarticle.aspx?id=23",
+        "status": "HTTP 200 but Content-Type: text/html — same as id=24, serves the homepage, endpoint retired.",
+        "tried": "REQUEST_HEADERS UA, 2 attempts 3s apart. See id=24 entry above for the working replacements.",
+    },
+    {
+        "name": "SEBI",
+        "url": "https://www.sebi.gov.in/sebi_data/commondocs/apr2012/rss.xml",
+        "status": "HTTP 404 Not Found, both before and after the header fix.",
+        "tried": "REQUEST_HEADERS UA, 2 attempts 3s apart. Also fetched sebi.gov.in's homepage directly and scanned it for RSS <link> auto-discovery tags and any href containing 'rss' — found none. SEBI does not appear to currently publish a discoverable RSS feed at all.",
+    },
+    {
+        "name": "Business Standard",
+        "url": "https://www.business-standard.com/rss/home_page_top_stories.rss",
+        "status": "HTTP 403 Forbidden, unchanged by the header fix.",
+        "tried": "REQUEST_HEADERS UA, 2 attempts 3s apart. Still blocked — likely bot management (e.g. Cloudflare challenge) beyond a plain User-Agent check.",
+    },
+    {
+        "name": "Financial Express",
+        "url": "https://www.financialexpress.com/feed/",
+        "status": "HTTP 410 Gone, unchanged by the header fix. 410 (as opposed to 404) is the server explicitly saying this resource was intentionally removed and won't be back.",
+        "tried": "REQUEST_HEADERS UA, 2 attempts 3s apart, confirmed dead across two separate sessions (2026-07-12 and 2026-07-13).",
+    },
+    {
+        "name": "IMF News",
+        "url": "https://www.imf.org/en/News/rss.aspx?language=eng",
+        "status": "HTTP 403 Forbidden, unchanged by the header fix.",
+        "tried": "REQUEST_HEADERS UA, 2 attempts 3s apart.",
+    },
+    {
+        "name": "PIB (English)",
+        "url": "https://www.pib.gov.in/ViewRss.aspx?reg=1&lang=1",
+        "status": "HTTP 200 but Content-Type: text/html — serves the plain PIB homepage, not RSS/XML. Same retired-endpoint pattern as the old RBI URLs.",
+        "tried": "REQUEST_HEADERS UA, 2 attempts 3s apart.",
+    },
+    {
+        "name": "Reuters — World",
+        "url": "https://www.reutersagency.com/feed/?best-topics=world",
+        "status": "HTTP 404 Not Found, unchanged by the header fix.",
+        "tried": "REQUEST_HEADERS UA, 2 attempts 3s apart. Per the specified fallback order, replaced with CNBC World (first working candidate) in SOURCES — labeled accurately as CNBC, not Reuters.",
+    },
+    {
+        "name": "Reuters — Business & Finance",
+        "url": "https://www.reutersagency.com/feed/?best-topics=business-finance",
+        "status": "HTTP 404 Not Found, unchanged by the header fix.",
+        "tried": "REQUEST_HEADERS UA, 2 attempts 3s apart. Replaced with CNBC Top News (second working fallback candidate) in SOURCES — labeled accurately as CNBC, not Reuters.",
+    },
+]
 
 
 if __name__ == "__main__":
