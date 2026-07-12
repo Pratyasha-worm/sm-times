@@ -1,0 +1,18 @@
+# Never commit this — it may contain real portfolio holdings.
+# The page reads it as an optional script; the site works fully without it.
+portfolio.js
+
+# OS cruft
+.DS_Store
+
+# Editor
+.vscode/
+.idea/
+
+# Logs from ingest.py / cron
+ingest.log
+*.tmp
+
+# Python
+__pycache__/
+*.pyc
