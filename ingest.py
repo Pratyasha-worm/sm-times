@@ -49,7 +49,18 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_PATH = os.path.join(SCRIPT_DIR, "data.js")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL   = "gemini-1.5-flash-latest"
+# 2026-07-13: gemini-flash-latest (resolves to gemini-3.5-flash) has only a
+# 20-request/day free-tier cap on this project — confirmed via a live 429
+# response's quotaId (GenerateRequestsPerDayPerProjectPerModel-FreeTier,
+# quotaValue 20). Too low to run a full ~18-section pipeline. Checked other
+# candidates before switching: gemini-2.5-flash and gemini-2.5-flash-lite
+# are retired (404, "no longer available to new users"); gemini-2.0-flash,
+# gemini-2.0-flash-lite, and gemini-2.0-flash-001 all show null/no
+# free-tier quota at all on this project (it only grants free quota to the
+# newest model generation). gemini-flash-lite-latest (-> gemini-3.1-flash-
+# lite) is the only candidate that both works and isn't already capped at
+# a token count this low — pinned to that instead.
+GEMINI_MODEL   = "gemini-flash-lite-latest"
 GEMINI_ENDPOINT = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
     f"{GEMINI_MODEL}:generateContent"
