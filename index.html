@@ -2882,7 +2882,7 @@
       const fetchedTs = tsMatch ? tsMatch[1] : '';
 
       if (fetchedTs && fetchedTs !== PAGE_LOAD_EDITION_TS) {
-        // A newer edition is available — prompt the user to reload.
+        // A newer edition is already published — prompt the user to reload.
         btn.innerHTML = '🆕 New edition!';
         const doReload = confirm(
           `A new edition is available (published ${fetchedTs}).\n\nReload now to see the latest content?`
@@ -2891,9 +2891,23 @@
         btn.innerHTML = origHTML;
         btn.disabled = false;
       } else {
-        // Already on latest edition.
-        btn.innerHTML = '✓ Up to date';
-        setTimeout(() => { btn.innerHTML = origHTML; btn.disabled = false; }, 2000);
+        // Already on the latest published edition. Checking data.js only
+        // tells you whether something newer has already been generated —
+        // it can't generate new content itself. Offer to actually kick
+        // off a fresh ingestion run instead of just stopping here (via a
+        // Netlify Function that triggers the GitHub Actions workflow;
+        // see netlify/functions/trigger-refresh.js).
+        const doTrigger = confirm(
+          "You're on the latest published edition.\n\n" +
+          "Trigger a brand-new refresh right now? This re-fetches live sources " +
+          "and takes a few minutes — check back and press Refresh again once it's done."
+        );
+        if (doTrigger) {
+          await triggerFreshRefresh(btn, origHTML);
+        } else {
+          btn.innerHTML = '✓ Up to date';
+          setTimeout(() => { btn.innerHTML = origHTML; btn.disabled = false; }, 2000);
+        }
       }
     } catch (e) {
       // fetch failed (file:// protocol) — just reload the page;
@@ -2902,6 +2916,27 @@
       setTimeout(() => location.reload(), 600);
     }
   });
+
+  async function triggerFreshRefresh(btn, origHTML) {
+    btn.innerHTML = '🚀 Starting refresh…';
+    try {
+      const res = await fetch('/.netlify/functions/trigger-refresh', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        btn.innerHTML = '✓ Refresh started';
+        alert(data.message || 'Refresh started — check back in a few minutes.');
+      } else {
+        btn.innerHTML = '✗ Could not start';
+        alert(data.error || `Could not start a refresh (HTTP ${res.status}).`);
+      }
+    } catch (e) {
+      // Most likely opened as a local file:// page, where there's no
+      // Netlify Function to call at all.
+      btn.innerHTML = '✗ Could not start';
+      alert('Could not reach the refresh trigger — this only works on the deployed site.');
+    }
+    setTimeout(() => { btn.innerHTML = origHTML; btn.disabled = false; }, 2500);
+  }
 
   // ─────────────────────────────────────────────
   // FLOATING TOOLS

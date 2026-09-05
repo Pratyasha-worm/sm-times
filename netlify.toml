@@ -1,0 +1,9 @@
+# Matches the site's existing dashboard settings (no build command,
+# publish the repo root as-is) — this file only adds the Functions
+# directory declaration on top of that, it isn't meant to change how
+# the static site itself gets deployed.
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
