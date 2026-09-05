@@ -2872,7 +2872,13 @@
       const text = await res.text();
 
       // Extract the lastUpdated field from the fetched data.js text.
-      const tsMatch = text.match(/lastUpdated\s*:\s*["']([^"']+)["']/);
+      // The quote around the key itself is optional: ingest.py's
+      // JSON-formatted output writes "lastUpdated": "...", while an
+      // older hand-authored data.js used the unquoted JS-object form
+      // lastUpdated: "..." — match both so this doesn't silently
+      // break (always reporting "up to date") whichever format wrote
+      // the file that's actually deployed.
+      const tsMatch = text.match(/["']?lastUpdated["']?\s*:\s*["']([^"']+)["']/);
       const fetchedTs = tsMatch ? tsMatch[1] : '';
 
       if (fetchedTs && fetchedTs !== PAGE_LOAD_EDITION_TS) {
