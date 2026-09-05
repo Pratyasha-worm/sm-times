@@ -1,0 +1,54 @@
+name: Refresh Edition
+
+# Runs the ingestion pipeline on GitHub's infrastructure instead of a
+# laptop — the 06:00/18:00 IST schedule fires regardless of whether any
+# machine is on. `workflow_dispatch` also lets this be triggered on
+# demand via the GitHub API, which is what the site's Refresh button
+# calls (through a Netlify Function that holds the trigger token
+# server-side — never in client-side JS).
+on:
+  schedule:
+    - cron: "30 0 * * *"   # 06:00 IST
+    - cron: "30 12 * * *"  # 18:00 IST
+  workflow_dispatch: {}
+
+# Only contents:write is needed, to commit + push data.js with the
+# job's own auto-issued GITHUB_TOKEN — no personal access token or
+# stored credential required for this to work, unlike the laptop-cron
+# version, which is exactly what kept silently breaking.
+permissions:
+  contents: write
+
+# Queue rather than cancel if a scheduled run and a manual on-demand
+# trigger land at the same time, so two pushes never race each other.
+concurrency:
+  group: refresh-edition
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run ingestion pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python3 ingest.py
+
+      - name: Commit and push data.js if it changed
+        run: |
+          git config user.name "SM Times Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data.js
+          if git diff --cached --quiet -- data.js; then
+            echo "No changes to data.js — nothing to commit."
+            exit 0
+          fi
+          git commit -m "Auto-refresh edition for $(date -u '+%B %-d, %Y %H:%M UTC') [GitHub Actions]"
+          git push
