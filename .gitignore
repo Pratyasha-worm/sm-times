@@ -2,6 +2,11 @@
 # The page reads it as an optional script; the site works fully without it.
 portfolio.js
 
+# Never commit this — holds GEMINI_API_KEY for auto_refresh.sh / cron.
+# Kept out of the crontab entry itself (crontab -l and `ps` would both
+# leak it in plaintext otherwise) and out of git for the same reason.
+.env
+
 # OS cruft
 .DS_Store
 
