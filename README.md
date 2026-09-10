@@ -15,16 +15,49 @@ No server, no build step, no dependencies.
 
 ---
 
+## Development (GitHub Codespaces)
+
+This project is developed and maintained through **GitHub Codespaces**
+— not a local checkout on any one machine. `.devcontainer/devcontainer.json`
+defines the environment (Python 3, git, `gh` — all preinstalled via the
+`universal` devcontainer image; nothing else is needed since `ingest.py`
+is pure stdlib and the site itself has no build step).
+
+**To start working on this project:**
+1. On the repo's GitHub page: **Code → Codespaces tab → Create codespace
+   on main**
+2. Wait for it to build (first time only; subsequent opens are fast)
+3. You get a full VS Code environment (browser or desktop) with a real
+   terminal, already authenticated to this repo via `gh`
+
+**One-time setup inside the Codespace environment** (only needed once
+per repo, not per Codespace): `GEMINI_API_KEY` should be set as a
+**Codespaces secret**, not typed into the container each time —
+`Settings → Secrets and variables → Codespaces` on GitHub, or:
+```bash
+gh secret set GEMINI_API_KEY --app codespaces --repo <owner>/sm-times
+```
+It's then injected automatically into every Codespace's environment.
+
+To open the live page for local preview inside a Codespace:
+```bash
+python3 -m http.server 8000
+# then open the forwarded port 8000 in the browser
+```
+
+---
+
 ## File Structure
 
 ```
 sm-times/
-├── index.html        ← Full newspaper (UI + CSS + JS — all in one file)
-├── data.js           ← Current edition content (auto-written by ingest.py)
-├── portfolio.js      ← Your portfolio config for relevance tagging (optional)
-├── ingest.py         ← Ingestion pipeline — fetches live data, writes data.js
-├── setup_cron.sh     ← Installs 12-hour cron job for auto-refresh
-└── README.md         ← This file
+├── index.html                    ← Full newspaper (UI + CSS + JS — all in one file)
+├── data.js                       ← Current edition content (auto-written by ingest.py)
+├── portfolio.js                  ← Your portfolio config for relevance tagging (optional)
+├── ingest.py                     ← Ingestion pipeline — fetches live data, writes data.js
+├── .github/workflows/refresh.yml ← Scheduled + on-demand refresh (GitHub Actions)
+├── .devcontainer/devcontainer.json ← GitHub Codespaces dev environment
+└── README.md                     ← This file
 ```
 
 ---
@@ -65,30 +98,49 @@ new timestamp and prompt you to reload.
 
 ---
 
-## Auto-Refresh (12-hour cron)
+## Auto-Refresh (GitHub Actions — not a local cron job)
 
-Install a cron job that runs the ingestion pipeline at **06:00 IST** and
-**18:00 IST** every day, automatically overwriting `data.js`:
+The edition refreshes itself at **06:00 IST** and **18:00 IST** every day
+via a scheduled GitHub Actions workflow (`.github/workflows/refresh.yml`),
+which runs `ingest.py` and commits + pushes `data.js` straight to `main`
+if it changed. This runs entirely on GitHub's own servers — **no laptop,
+cron job, or local machine needs to be on for this to work.**
 
-```bash
-chmod +x setup_cron.sh
-./setup_cron.sh
+An earlier version of this used a local `cron` job (`setup_cron.sh` +
+`auto_refresh.sh`) instead. That's been removed: cron only fires if the
+machine running it happens to be awake at the scheduled time, which
+made the whole site quietly go stale for weeks when that wasn't the
+case. GitHub Actions has no such dependency.
 
-# To remove the cron job
-./setup_cron.sh --remove
+**To trigger a refresh on demand** (outside the twice-daily schedule),
+either:
+- On GitHub: **Actions tab → "Refresh Edition" → Run workflow**, or
+- From any machine with `gh` installed and authenticated:
+  ```bash
+  gh workflow run refresh.yml --repo <owner>/sm-times
+  ```
 
-# View scheduled jobs
-crontab -l
+(An earlier version also let the site's own Refresh button trigger this
+via a Netlify Function calling GitHub's dispatch API. That's been
+dropped — it got stuck on a platform-specific environment-variable issue
+that never resolved, and triggering straight from GitHub is simpler with
+one less moving part to debug.)
 
-# View ingestion logs
-tail -f ingest.log
-```
+**Required setup:** `GEMINI_API_KEY` must be set as a **GitHub Actions
+repository secret** (`Settings → Secrets and variables → Actions`, or
+`gh secret set GEMINI_API_KEY --app actions --repo <owner>/sm-times`).
+Without it, the workflow still runs but produces no AI-enriched content
+— empty stories get excluded rather than shipped with boilerplate (see
+"Ingestion Sources" below).
 
-**How the in-page Refresh button works (V2):**
+**How the in-page Refresh button works:**
 - On page load, the current `EDITION.lastUpdated` timestamp is recorded.
 - When you press Refresh, the button fetches `data.js` fresh (cache-busted)
   and compares the `lastUpdated` timestamp.
 - If a newer edition exists, it prompts you to reload the page.
+- If nothing newer exists yet, it just reports "up to date" — it only
+  checks for an edition that's *already been published*, it doesn't
+  generate one. Use the Actions tab / `gh workflow run` above for that.
 - If `data.js` is served via `file://` (direct browser open), the button
   falls back to a simple page reload, which picks up the latest file.
 

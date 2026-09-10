@@ -1,0 +1,24 @@
+{
+  "name": "SM Times",
+  // Universal image: Python 3, git, and the GitHub CLI all come
+  // preinstalled — this project has no other runtime dependencies
+  // (ingest.py is pure stdlib; the site itself is static HTML/CSS/JS
+  // with no build step).
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python"
+      ]
+    }
+  },
+
+  // GEMINI_API_KEY is read from a Codespaces secret configured on the
+  // repo (Settings -> Secrets and variables -> Codespaces, or
+  // `gh secret set GEMINI_API_KEY --app codespaces --repo <owner>/<repo>`),
+  // not from anything checked into this repo. It's automatically
+  // injected into every Codespace's environment as-is — no extra
+  // wiring needed here.
+  "postCreateCommand": "python3 --version && git --version && gh --version && echo 'Codespace ready. Try: python3 ingest.py --dry-run'"
+}

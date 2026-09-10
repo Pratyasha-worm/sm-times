@@ -88,3 +88,71 @@
         creating the GitHub repo, pushing, and connecting
         Netlify/Vercel. No commit has been made yet either — ask
         before committing.
+
+## Automation migration: laptop cron → GitHub Actions, dev moved to Codespaces (2026-09-10)
+
+- [x] Diagnosed and fixed the real reason the site had gone stale for
+      weeks: `setup_cron.sh` had never actually been installed, and
+      separately, the stored GitHub push credential had silently
+      disappeared from the local keychain — confirmed via
+      `security find-internet-password`, fixed via `gh auth login`.
+- [x] Built `auto_refresh.sh` + fixed `setup_cron.sh` (a `pipefail`
+      bug that aborted first-ever installs, and a dedup-filter bug
+      that accumulated duplicate crontab comments) — this local-cron
+      approach worked but was later replaced (see below).
+- [x] **Replaced local cron entirely with GitHub Actions**
+      (`.github/workflows/refresh.yml`): same 06:00/18:00 IST
+      schedule, runs on GitHub's own servers, pushes with the job's
+      own auto-issued `GITHUB_TOKEN` (no personal token needed for
+      this part). Verified with a real manual `workflow_dispatch`
+      run — completed in 1m45s, real commit landed, live site
+      updated. Local crontab removed (`setup_cron.sh --remove`) to
+      avoid both mechanisms racing on the same schedule.
+- [x] Found and fixed a real bug while doing this: the in-page
+      Refresh button's regex for parsing `data.js`'s `lastUpdated`
+      field only matched the old hand-authored unquoted-key format,
+      not `ingest.py`'s actual JSON-quoted-key output — the button
+      was silently always reporting "up to date" even when a newer
+      edition existed. Confirmed against the real deployed file
+      before and after the fix.
+- [x] **Mistake made and corrected**: while verifying the cron
+      install, briefly displayed the real `GEMINI_API_KEY` in
+      plaintext via `crontab -l` output. Caught it, moved the key
+      out of any crontab entry into a `chmod 600` `.env` file
+      (gitignored) sourced by `auto_refresh.sh`, and told the user
+      to rotate the key. That whole local-key mechanism is now moot
+      anyway since `auto_refresh.sh`/cron were removed — see below.
+- [x] Attempted an on-demand "trigger a real refresh" path for the
+      site's Refresh button: a Netlify Function
+      (`trigger-refresh.js`) calling GitHub's `workflow_dispatch`
+      API, with the dispatch token as a Netlify environment variable
+      (never client-side JS). Spent a long debugging session on a
+      Netlify-specific issue where the env var showed "0 values in 0
+      deploy contexts," then still wasn't visible to the function at
+      runtime even after confirming a value was attached to the
+      Production context and forcing multiple redeploys — root cause
+      never conclusively found.
+- [x] **Decision: dropped the Netlify Function entirely** rather than
+      keep debugging a platform-specific dead end. On-demand refresh
+      now happens via GitHub directly (Actions tab, or
+      `gh workflow run refresh.yml`) — one less moving part, no
+      unresolved mystery bug. Reverted the Refresh button to its
+      simpler "check for an already-published edition" behavior.
+      Removed `netlify/functions/trigger-refresh.js` and
+      `netlify.toml`.
+- [x] Removed `auto_refresh.sh`, `setup_cron.sh`, and the local
+      `.env` key file — fully redundant now that GitHub Actions
+      handles both scheduled and on-demand refresh.
+- [x] **Migrated the development workflow itself off the local
+      laptop**: added `.devcontainer/devcontainer.json` (universal
+      image — Python, git, `gh` preinstalled) so the project is
+      developed via **GitHub Codespaces** going forward, not a local
+      checkout. `GEMINI_API_KEY` set as both a GitHub Actions secret
+      and a separate Codespaces secret (`gh secret set ... --app
+      actions` / `--app codespaces`) — confirmed present via
+      `gh secret list` for each, values never printed.
+- [ ] Pending: actually spin up a test Codespace and verify
+      `ingest.py` runs correctly inside it end-to-end (Python
+      available, secret injected, real network access) before
+      calling the Codespaces migration fully verified — not yet
+      done as of this note.
