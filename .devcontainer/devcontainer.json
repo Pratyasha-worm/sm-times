@@ -6,6 +6,16 @@
   // with no build step).
   "image": "mcr.microsoft.com/devcontainers/universal:2",
 
+  // Needed for `gh codespace ssh` / plain `ssh` access from outside
+  // the browser/VS Code UI — the base universal image doesn't run an
+  // SSH server on its own even though Codespaces' own web/VS Code
+  // connection works without it.
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": {
+      "version": "latest"
+    }
+  },
+
   "customizations": {
     "vscode": {
       "extensions": [
