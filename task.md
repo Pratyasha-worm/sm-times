@@ -151,8 +151,26 @@
       and a separate Codespaces secret (`gh secret set ... --app
       actions` / `--app codespaces`) — confirmed present via
       `gh secret list` for each, values never printed.
-- [ ] Pending: actually spin up a test Codespace and verify
-      `ingest.py` runs correctly inside it end-to-end (Python
-      available, secret injected, real network access) before
-      calling the Codespaces migration fully verified — not yet
-      done as of this note.
+- [x] Spun up a real test Codespace (twice — see below) rather than
+      trusting the config blind:
+      - Created via `gh codespace create`, reached "Available" state
+        successfully both times (confirms the devcontainer.json
+        itself is valid and buildable — first attempt without the
+        `sshd` feature, second with it added).
+      - `gh codespace ssh` failed both times with "Permission denied
+        (publickey,password)". Diagnosed with `GH_DEBUG=api`: the
+        tunnel's access-control response shows an inherited
+        Organization-level policy with `"isDeny": true` on the
+        `connect` scope for the internal SSH port (2222) — this is a
+        platform/account security policy blocking direct SSH
+        connect, not a bug in the devcontainer. Did not attempt to
+        work around it (same principle as not spoofing a UA to
+        bypass a source's bot-blocking).
+      - **Net result: build/provisioning is verified working; the
+        runtime (Python/git/gh present, GEMINI_API_KEY injected,
+        ingest.py actually runs) is NOT verified from this session**
+        — that check needs to happen through the officially-supported
+        path (opening the Codespace in the browser or VS Code, which
+        isn't blocked by this policy), which only the user can do.
+      - Test Codespace stopped (not deleted) to avoid running cost
+        while unverified — `vigilant-zebra-7qxvv4q4p7j2xr67`.
